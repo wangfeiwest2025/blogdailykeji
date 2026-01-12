@@ -10,26 +10,16 @@ interface PostCardProps {
 }
 
 export const PostCard: React.FC<PostCardProps> = ({ post, onClick, onDelete, isOwner }) => {
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation(); // 阻止触发卡片的 onClick 进入详情页
-    if (onDelete) {
-      onDelete(post.id);
-    }
-  };
-
   return (
-    <div 
-      className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6 border border-gray-100 flex flex-col h-full group cursor-pointer" 
-      onClick={() => onClick(post)}
-    >
+    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6 border border-gray-100 flex flex-col h-full group">
       <div className="flex justify-between items-start mb-4">
-        <h3 className="text-xl font-bold text-gray-800 leading-tight group-hover:text-blue-600 transition-colors">
+        <h3 className="text-xl font-bold text-gray-800 leading-tight group-hover:text-blue-600 cursor-pointer transition-colors" onClick={() => onClick(post)}>
           {post.title}
         </h3>
         {isOwner && onDelete && (
           <button 
-            onClick={handleDelete}
-            className="text-gray-300 hover:text-red-500 transition-colors p-1 relative z-10"
+            onClick={() => onDelete(post.id)}
+            className="text-gray-300 hover:text-red-500 transition-colors p-1"
             title="Delete post"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
