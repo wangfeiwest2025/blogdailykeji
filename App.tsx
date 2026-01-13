@@ -70,22 +70,37 @@ const App: React.FC = () => {
 
   const t = useMemo(() => translations[lang], [lang]);
 
-  const [posts, setPosts] = useState<Post[]>(() => {
-    const saved = localStorage.getItem('blog_posts');
-    if (saved) return JSON.parse(saved);
-    return [{
-      id: 'initial-1',
-      title: translations[lang].initialTitle,
-      content: lang === 'zh' 
-        ? '# 欢迎来到 dailykeji\n这里是技术与简约碰撞的地方。'
-        : '# Welcome to dailykeji\nThis is where technology meets simplicity.',
-      summary: translations[lang].initialSummary,
-      tags: ['welcome', 'tech', 'dailykeji'],
-      createdAt: new Date().toISOString(),
-      author: 'wangfei',
-      views: 0
-    }];
-  });
+  const [posts, setPosts] = useState<Post[]>([]);
+
+  // Fetch posts from backend on component mount
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const response = await fetch('http://localhost:3007/api/posts');
+        if (response.ok) {
+          const fetchedPosts = await response.json();
+          setPosts(fetchedPosts);
+        }
+      } catch (error) {
+        console.error('Failed to fetch posts:', error);
+        // Fallback to initial post if API fails
+        setPosts([{
+          id: 'initial-1',
+          title: translations[lang].initialTitle,
+          content: lang === 'zh' 
+            ? '# 欢迎来到 dailykeji\n这里是技术与简约碰撞的地方。'
+            : '# Welcome to dailykeji\nThis is where technology meets simplicity.',
+          summary: translations[lang].initialSummary,
+          tags: ['welcome', 'tech', 'dailykeji'],
+          createdAt: new Date().toISOString(),
+          author: 'wangfei',
+          views: 0
+        }]);
+      }
+    };
+
+    fetchPosts();
+  }, [lang, translations]);
 
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('blog_user');
@@ -108,7 +123,6 @@ const App: React.FC = () => {
   const hasTracked = useRef(false);
 
   useEffect(() => localStorage.setItem('blog_lang', lang), [lang]);
-  useEffect(() => localStorage.setItem('blog_posts', JSON.stringify(posts)), [posts]);
   useEffect(() => localStorage.setItem('blog_user', JSON.stringify(user)), [user]);
   
   useEffect(() => {
@@ -126,16 +140,45 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Login attempt with:', loginInput.trim());
-    console.log('Comparison result:', loginInput.trim().toLowerCase() === 'wangfei');
     
     if (loginInput.trim().toLowerCase() === 'wangfei') {
-      setUser({ username: 'wangfei', isLoggedIn: true });
-      setLoginInput('');
-      setError(null);
-      console.log('Login successful!');
+      try {
+        // Try to authenticate with backend
+        const response = await fetch('http://localhost:3007/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: loginInput.trim(),
+            password: 'wangfei' // Using same password as username for simplicity
+          }),
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          setUser({ username: userData.username, isLoggedIn: true });
+          setLoginInput('');
+          setError(null);
+          console.log('Login successful!', userData);
+        } else {
+          // Fallback to local login if backend auth fails
+          setUser({ username: 'wangfei', isLoggedIn: true });
+          setLoginInput('');
+          setError(null);
+          console.log('Local login successful!');
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        // Fallback to local login
+        setUser({ username: 'wangfei', isLoggedIn: true });
+        setLoginInput('');
+        setError(null);
+        console.log('Fallback login successful!');
+      }
     } else {
       console.log('Login failed');
       setError('用户名不正确，请输入 wangfei');
@@ -148,16 +191,32 @@ const App: React.FC = () => {
     setIsEditing(false);
   };
 
-  const handlePostClick = (post: Post) => {
+  const handlePostClick = async (post: Post) => {
     const VIEWED_KEY = 'dailykeji_viewed_v11';
     const viewedIds = JSON.parse(sessionStorage.getItem(VIEWED_KEY) || '[]');
     
     if (!viewedIds.includes(post.id)) {
-      const updatedPosts = posts.map(p => p.id === post.id ? { ...p, views: p.views + 1 } : p);
-      setPosts(updatedPosts);
-      viewedIds.push(post.id);
-      sessionStorage.setItem(VIEWED_KEY, JSON.stringify(viewedIds));
-      setSelectedPost({ ...post, views: post.views + 1 });
+      // Increment view count on backend
+      try {
+        await fetch(`http://localhost:3007/api/posts/${post.id}/view`, {
+          method: 'POST',
+        });
+        
+        // Refresh posts to get updated view count
+        const postsResponse = await fetch('http://localhost:3007/api/posts');
+        if (postsResponse.ok) {
+          const updatedPosts = await postsResponse.json();
+          const updatedPost = updatedPosts.find((p: Post) => p.id === post.id);
+          setPosts(updatedPosts);
+          setSelectedPost(updatedPost);
+        }
+        
+        viewedIds.push(post.id);
+        sessionStorage.setItem(VIEWED_KEY, JSON.stringify(viewedIds));
+      } catch (error) {
+        console.error('Failed to increment view count:', error);
+        setSelectedPost(post);
+      }
     } else {
       setSelectedPost(post);
     }
@@ -178,20 +237,37 @@ const App: React.FC = () => {
     setIsProcessing(true);
     try {
       const metadata = await generatePostMetadata(editContent);
-      const updatedPost = {
-        ...selectedPost,
-        title: editTitle.trim(),
-        content: editContent,
-        summary: metadata.summary,
-        tags: metadata.tags
-      };
       
-      const newPosts = posts.map(p => p.id === selectedPost.id ? updatedPost : p);
-      setPosts(newPosts);
-      setSelectedPost(updatedPost);
-      setIsEditing(false);
-      setError(null);
+      // Send update to backend
+      const response = await fetch(`http://localhost:3007/api/posts/${selectedPost.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          content: editContent,
+          summary: metadata.summary,
+          tags: metadata.tags
+        }),
+      });
+      
+      if (response.ok) {
+        // Refresh posts from backend
+        const postsResponse = await fetch('http://localhost:3007/api/posts');
+        if (postsResponse.ok) {
+          const updatedPosts = await postsResponse.json();
+          const updatedPost = updatedPosts.find((p: Post) => p.id === selectedPost.id);
+          setPosts(updatedPosts);
+          setSelectedPost(updatedPost);
+          setIsEditing(false);
+          setError(null);
+        }
+      } else {
+        throw new Error('Update failed');
+      }
     } catch (err) {
+      console.error('Save error:', err);
       setError(t.saveError);
     } finally {
       setIsProcessing(false);
@@ -224,20 +300,16 @@ const App: React.FC = () => {
         console.warn('File uploaded but git commit failed:', result.message);
       }
       
-      // Create new post for local display
-      const text = await file.text();
-      const metadata = await generatePostMetadata(text);
-      const newPost: Post = {
-        id: result.id || `post-${Date.now()}`,
-        title: result.title || file.name.replace('.md', '').replace(/[-_]/g, ' '),
-        content: text,
-        summary: result.summary || metadata.summary,
-        tags: metadata.tags,
-        createdAt: new Date().toISOString(),
-        author: user.username,
-        views: 0
-      };
-      setPosts(prev => [newPost, ...prev]);
+      // Refresh posts from backend after successful upload
+      try {
+        const postsResponse = await fetch('http://localhost:3007/api/posts');
+        if (postsResponse.ok) {
+          const updatedPosts = await postsResponse.json();
+          setPosts(updatedPosts);
+        }
+      } catch (error) {
+        console.error('Failed to refresh posts:', error);
+      }
       
       // Show success message
       alert(`✅ ${result.message || 'File uploaded successfully!'}`);
@@ -252,16 +324,32 @@ const App: React.FC = () => {
     }
   };
 
-  const deletePost = (id: string) => {
+  const deletePost = async (id: string) => {
     if (window.confirm(t.deleteConfirm)) {
-      setPosts(prev => {
-        const nextPosts = prev.filter(p => p.id !== id);
-        localStorage.setItem('blog_posts', JSON.stringify(nextPosts));
-        return nextPosts;
-      });
-      if (selectedPost?.id === id) {
-        setSelectedPost(null);
-        setIsEditing(false);
+      try {
+        const response = await fetch(`http://localhost:3007/api/posts/${id}`, {
+          method: 'DELETE',
+        });
+        
+        if (response.ok) {
+          // Refresh posts from backend
+          const postsResponse = await fetch('http://localhost:3007/api/posts');
+          if (postsResponse.ok) {
+            const updatedPosts = await postsResponse.json();
+            setPosts(updatedPosts);
+          }
+          
+          // Clear selected post if it was deleted
+          if (selectedPost?.id === id) {
+            setSelectedPost(null);
+            setIsEditing(false);
+          }
+        } else {
+          throw new Error('Delete failed');
+        }
+      } catch (error) {
+        console.error('Delete error:', error);
+        alert('删除失败，请重试');
       }
     }
   };
@@ -328,7 +416,7 @@ const App: React.FC = () => {
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                   {t.return}
                 </button>
-                {user?.username === 'wangfei' && !isEditing && (
+                {user && !isEditing && (
                   <div className="flex gap-2">
                     <button onClick={handleEditStart} className="px-5 py-2.5 bg-black text-white text-[10px] font-black uppercase rounded-xl hover:bg-blue-600 transition-all shadow-lg shadow-gray-200">{t.edit}</button>
                     <button onClick={() => deletePost(selectedPost.id)} className="px-5 py-2.5 bg-red-50 text-red-500 text-[10px] font-black uppercase rounded-xl hover:bg-red-500 hover:text-white transition-all">Delete</button>
@@ -416,7 +504,7 @@ const App: React.FC = () => {
                       post={post} 
                       onClick={handlePostClick} 
                       onDelete={deletePost} 
-                      isOwner={user?.username === 'wangfei'} 
+                      isOwner={!!user}
                     />
                   ))}
                 </div>
@@ -446,7 +534,7 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {user?.username === 'wangfei' ? (
+          {user ? (
             <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-sm transition-all hover:shadow-xl hover:-translate-y-1">
               <h3 className="text-[10px] font-black uppercase text-gray-400 mb-8 tracking-[0.3em]">{t.publishing}</h3>
               <label className="w-full flex flex-col items-center py-14 bg-gray-50 border-4 border-dashed border-gray-100 rounded-[2rem] cursor-pointer hover:border-blue-600 hover:bg-blue-50/50 transition-all group relative overflow-hidden">
