@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Post, User } from './types';
 import { PostCard } from './components/PostCard';
 import { generatePostMetadata } from './services/geminiService';
+import { getApiConfig } from './src/apiConfig';
 
 const translations = {
   zh: {
@@ -76,7 +77,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const response = await fetch('http://localhost:3007/api/posts');
+        const apiConfig = getApiConfig();
+        const response = await fetch(apiConfig.posts);
         if (response.ok) {
           const fetchedPosts = await response.json();
           setPosts(fetchedPosts);
@@ -147,7 +149,8 @@ const App: React.FC = () => {
     if (loginInput.trim().toLowerCase() === 'wangfei') {
       try {
         // Try to authenticate with backend
-        const response = await fetch('http://localhost:3007/api/auth/login', {
+        const apiConfig = getApiConfig();
+        const response = await fetch(apiConfig.auth, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -198,12 +201,13 @@ const App: React.FC = () => {
     if (!viewedIds.includes(post.id)) {
       // Increment view count on backend
       try {
-        await fetch(`http://localhost:3007/api/posts/${post.id}/view`, {
+        const apiConfig = getApiConfig();
+        await fetch(`${apiConfig.baseUrl}/api/posts/${post.id}/view`, {
           method: 'POST',
         });
         
         // Refresh posts to get updated view count
-        const postsResponse = await fetch('http://localhost:3007/api/posts');
+        const postsResponse = await fetch(apiConfig.posts);
         if (postsResponse.ok) {
           const updatedPosts = await postsResponse.json();
           const updatedPost = updatedPosts.find((p: Post) => p.id === post.id);
@@ -239,7 +243,8 @@ const App: React.FC = () => {
       const metadata = await generatePostMetadata(editContent);
       
       // Send update to backend
-      const response = await fetch(`http://localhost:3007/api/posts/${selectedPost.id}`, {
+      const apiConfig = getApiConfig();
+      const response = await fetch(`${apiConfig.baseUrl}/api/posts/${selectedPost.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -254,7 +259,7 @@ const App: React.FC = () => {
       
       if (response.ok) {
         // Refresh posts from backend
-        const postsResponse = await fetch('http://localhost:3007/api/posts');
+        const postsResponse = await fetch(apiConfig.posts);
         if (postsResponse.ok) {
           const updatedPosts = await postsResponse.json();
           const updatedPost = updatedPosts.find((p: Post) => p.id === selectedPost.id);
@@ -283,11 +288,12 @@ const App: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      // Upload to server
-      const response = await fetch('http://localhost:3007/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+       // Upload to server
+       const apiConfig = getApiConfig();
+       const response = await fetch(apiConfig.upload, {
+         method: 'POST',
+         body: formData,
+       });
       
       if (!response.ok) {
         throw new Error('Upload failed');
@@ -300,16 +306,17 @@ const App: React.FC = () => {
         console.warn('File uploaded but git commit failed:', result.message);
       }
       
-      // Refresh posts from backend after successful upload
-      try {
-        const postsResponse = await fetch('http://localhost:3007/api/posts');
-        if (postsResponse.ok) {
-          const updatedPosts = await postsResponse.json();
-          setPosts(updatedPosts);
-        }
-      } catch (error) {
-        console.error('Failed to refresh posts:', error);
-      }
+// Refresh posts from backend after successful upload
+       try {
+         const apiConfig = getApiConfig();
+         const postsResponse = await fetch(apiConfig.posts);
+         if (postsResponse.ok) {
+           const updatedPosts = await postsResponse.json();
+           setPosts(updatedPosts);
+         }
+       } catch (error) {
+         console.error('Failed to refresh posts:', error);
+       }
       
       // Show success message
       alert(`✅ ${result.message || 'File uploaded successfully!'}`);
@@ -327,13 +334,14 @@ const App: React.FC = () => {
   const deletePost = async (id: string) => {
     if (window.confirm(t.deleteConfirm)) {
       try {
-        const response = await fetch(`http://localhost:3007/api/posts/${id}`, {
+        const apiConfig = getApiConfig();
+        const response = await fetch(`${apiConfig.baseUrl}/api/posts/${id}`, {
           method: 'DELETE',
         });
         
         if (response.ok) {
           // Refresh posts from backend
-          const postsResponse = await fetch('http://localhost:3007/api/posts');
+          const postsResponse = await fetch(apiConfig.posts);
           if (postsResponse.ok) {
             const updatedPosts = await postsResponse.json();
             setPosts(updatedPosts);
