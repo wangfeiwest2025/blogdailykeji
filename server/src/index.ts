@@ -12,7 +12,7 @@ import { Post, User, AuthUser, BlogStats } from './types';
 const execAsync = promisify(exec);
 
 const app = express();
-const port = process.env.PORT || 3003;
+const port = process.env.PORT || 3005;
 const upload = multer({ dest: 'uploads/' });
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
