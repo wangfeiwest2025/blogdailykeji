@@ -196,21 +196,49 @@ const App: React.FC = () => {
     if (!file || !user) return;
     setIsProcessing(true);
     try {
+      // Create FormData to send file to server
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Upload to server
+      const response = await fetch('http://localhost:3006/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      const result = await response.json();
+      console.log('Upload result:', result);
+      
+      if (!result.gitCommitted) {
+        console.warn('File uploaded but git commit failed:', result.message);
+      }
+      
+      // Create new post for local display
       const text = await file.text();
       const metadata = await generatePostMetadata(text);
       const newPost: Post = {
-        id: `post-${Date.now()}`,
-        title: file.name.replace('.md', '').replace(/[-_]/g, ' '),
+        id: result.id || `post-${Date.now()}`,
+        title: result.title || file.name.replace('.md', '').replace(/[-_]/g, ' '),
         content: text,
-        summary: metadata.summary,
+        summary: result.summary || metadata.summary,
         tags: metadata.tags,
         createdAt: new Date().toISOString(),
         author: user.username,
         views: 0
       };
       setPosts(prev => [newPost, ...prev]);
+      
+      // Show success message
+      alert(`✅ ${result.message || 'File uploaded successfully!'}`);
+      
     } catch (err) {
+      console.error('Upload error:', err);
       setError(t.uploadError);
+      alert(`❌ ${t.uploadError}`);
     } finally {
       setIsProcessing(false);
       if (e.target) e.target.value = '';
