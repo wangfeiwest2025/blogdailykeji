@@ -4,34 +4,32 @@ const API_CONFIG = {
   production: {
     baseUrl: '',
     posts: '/api/posts',
-    postDetail: (id) => `/api/posts/${id}`,
-    postView: (id) => `/api/posts/${id}/view`,
-    auth: '/api/auth/login',
     upload: '/api/upload',
+    auth: '/api/auth/login',
     stats: '/api/stats'
   },
   // Development: local backend server
   development: {
     baseUrl: 'http://localhost:3007',
     posts: 'http://localhost:3007/api/posts',
-    postDetail: (id) => `http://localhost:3007/api/posts/${id}`,
-    postView: (id) => `http://localhost:3007/api/posts/${id}/view`,
-    auth: 'http://localhost:3007/api/auth/login',
     upload: 'http://localhost:3007/api/upload',
+    auth: 'http://localhost:3007/api/auth/login',
     stats: 'http://localhost:3007/api/stats'
   }
 };
 
-export const getApiConfig = () => {
+export function getApiConfig() {
   const isBrowser = typeof window !== 'undefined';
   const isProduction = isBrowser && window.location.hostname !== 'localhost';
   return API_CONFIG[isProduction ? 'production' : 'development'];
-};
+}
 
-export const getApiUrl = (endpoint, id?) => {
+export function getPostDetailUrl(id: string) {
   const config = getApiConfig();
-  if (id) {
-    return config.postDetail(id);
-  }
-  return config[endpoint] || config.posts;
-};
+  return `${config.baseUrl}/api/posts/${id}`;
+}
+
+export function getPostViewUrl(id: string) {
+  const config = getApiConfig();
+  return `${config.baseUrl}/api/posts/${id}/view`;
+}

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Post, User } from './types';
 import { PostCard } from './components/PostCard';
 import { generatePostMetadata } from './services/geminiService';
-import { getApiUrl } from './src/apiConfig';
+import { getApiConfig, getPostDetailUrl, getPostViewUrl } from './src/apiConfig';
 
 const translations = {
   zh: {
@@ -77,7 +77,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const response = await fetch(getApiUrl('posts'));
+        const apiConfig = getApiConfig();
+        const response = await fetch(apiConfig.posts);
         if (response.ok) {
           const fetchedPosts = await response.json();
           setPosts(fetchedPosts);
@@ -325,6 +326,7 @@ const App: React.FC = () => {
       
       // Refresh posts from backend after successful upload
       try {
+        const apiConfig = getApiConfig();
         const postsResponse = await fetch(apiConfig.posts);
         if (postsResponse.ok) {
           const updatedPosts = await postsResponse.json();
