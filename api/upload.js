@@ -7,17 +7,21 @@ export default async function handler(req, res) {
       return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
 
-    // For Vercel, we'll handle the content directly instead of file upload
     const { title, content, filename } = req.body;
     
     if (!title || !content) {
-      return res.status(400).json({ error: 'Title and content are required' });
+      return res.status(400).json({ error: '标题和内容都是必需的' });
     }
 
-    const summary = content.slice(0, 100).replace(/[#*`]/g, '') + '...';
+    // Generate summary from content
+    const summary = content
+      .replace(/[#*`]/g, '')
+      .slice(0, 100)
+      .trim() + '...';
+    
     const tags = ['markdown', 'blog', 'upload'];
     const id = `post-${Date.now()}`;
-    const author = 'admin';
+    const author = 'wangfei';
     const createdAt = new Date().toISOString();
 
     const db = await getDb();
@@ -31,11 +35,10 @@ export default async function handler(req, res) {
       id, 
       title, 
       summary,
-      gitCommitted: false, // Git operations not available in Vercel
-      message: 'Post created successfully'
+      message: '文章发布成功'
     });
   } catch (error) {
     console.error('Upload API error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '服务器错误，上传失败' });
   }
 }

@@ -284,16 +284,23 @@ const App: React.FC = () => {
     if (!file || !user) return;
     setIsProcessing(true);
     try {
-      // Create FormData to send file to server
-      const formData = new FormData();
-      formData.append('file', file);
+      // Read file content
+      const content = await file.text();
+      const title = file.name.replace('.md', '').replace(/[-_]/g, ' ');
       
-       // Upload to server
-       const apiConfig = getApiConfig();
-       const response = await fetch(apiConfig.upload, {
-         method: 'POST',
-         body: formData,
-       });
+      // Upload to server as JSON
+      const apiConfig = getApiConfig();
+      const response = await fetch(apiConfig.upload, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: title,
+          content: content,
+          filename: file.name
+        }),
+      });
       
       if (!response.ok) {
         throw new Error('Upload failed');
@@ -302,24 +309,19 @@ const App: React.FC = () => {
       const result = await response.json();
       console.log('Upload result:', result);
       
-      if (!result.gitCommitted) {
-        console.warn('File uploaded but git commit failed:', result.message);
+      // Refresh posts from backend after successful upload
+      try {
+        const postsResponse = await fetch(apiConfig.posts);
+        if (postsResponse.ok) {
+          const updatedPosts = await postsResponse.json();
+          setPosts(updatedPosts);
+        }
+      } catch (error) {
+        console.error('Failed to refresh posts:', error);
       }
       
-// Refresh posts from backend after successful upload
-       try {
-         const apiConfig = getApiConfig();
-         const postsResponse = await fetch(apiConfig.posts);
-         if (postsResponse.ok) {
-           const updatedPosts = await postsResponse.json();
-           setPosts(updatedPosts);
-         }
-       } catch (error) {
-         console.error('Failed to refresh posts:', error);
-       }
-      
       // Show success message
-      alert(`✅ ${result.message || 'File uploaded successfully!'}`);
+      alert(`✅ 文章发布成功！`);
       
     } catch (err) {
       console.error('Upload error:', err);
