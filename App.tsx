@@ -284,23 +284,38 @@ const App: React.FC = () => {
     if (!file || !user) return;
     setIsProcessing(true);
     try {
-      // Read file content
-      const content = await file.text();
-      const title = file.name.replace('.md', '').replace(/[-_]/g, ' ');
-      
-      // Upload to server as JSON
+      // Check if we're in production (Vercel) or development
+      const isProduction = window.location.hostname !== 'localhost';
       const apiConfig = getApiConfig();
-      const response = await fetch(apiConfig.upload, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: title,
-          content: content,
-          filename: file.name
-        }),
-      });
+      
+      let response;
+      
+      if (isProduction) {
+        // Vercel: Send JSON with content
+        const content = await file.text();
+        const title = file.name.replace('.md', '').replace(/[-_]/g, ' ');
+        
+        response = await fetch(apiConfig.upload, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: title,
+            content: content,
+            filename: file.name
+          }),
+        });
+      } else {
+        // Local: Send FormData with file
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        response = await fetch(apiConfig.upload, {
+          method: 'POST',
+          body: formData,
+        });
+      }
       
       if (!response.ok) {
         throw new Error('Upload failed');
