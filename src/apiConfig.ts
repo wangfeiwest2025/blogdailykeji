@@ -1,9 +1,11 @@
 // API configuration for different environments
-export const API_CONFIG = {
-  // Production: Vercel serverless functions (relative paths)
+const API_CONFIG = {
+  // Production: Vercel serverless functions
   production: {
     baseUrl: '',
     posts: '/api/posts',
+    postDetail: (id) => `/api/posts/${id}`,
+    postView: (id) => `/api/posts/${id}/view`,
     auth: '/api/auth/login',
     upload: '/api/upload',
     stats: '/api/stats'
@@ -12,6 +14,8 @@ export const API_CONFIG = {
   development: {
     baseUrl: 'http://localhost:3007',
     posts: 'http://localhost:3007/api/posts',
+    postDetail: (id) => `http://localhost:3007/api/posts/${id}`,
+    postView: (id) => `http://localhost:3007/api/posts/${id}/view`,
     auth: 'http://localhost:3007/api/auth/login',
     upload: 'http://localhost:3007/api/upload',
     stats: 'http://localhost:3007/api/stats'
@@ -19,18 +23,15 @@ export const API_CONFIG = {
 };
 
 export const getApiConfig = () => {
-  // Check if we're in browser environment
   const isBrowser = typeof window !== 'undefined';
-  const isProduction = process.env.NODE_ENV === 'production' || 
-                      (isBrowser && window.location.hostname !== 'localhost');
+  const isProduction = isBrowser && window.location.hostname !== 'localhost';
   return API_CONFIG[isProduction ? 'production' : 'development'];
 };
 
-export const createApiUrl = (endpoint: string, id?: string) => {
+export const getApiUrl = (endpoint, id?) => {
   const config = getApiConfig();
-  let url = config[endpoint];
   if (id) {
-    url = `${config.baseUrl}/api/posts/${id}`;
+    return config.postDetail(id);
   }
-  return url;
+  return config[endpoint] || config.posts;
 };
