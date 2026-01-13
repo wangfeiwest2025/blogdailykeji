@@ -3,17 +3,27 @@ import { getDb } from './database.js';
 export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
-      res.setHeader('Allow', ['POST']);
-      return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+      return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { title, content, filename } = req.body;
+    // Handle both JSON and multipart data
+    let title, content, filename;
     
+    if (req.body && req.body.title && req.body.content) {
+      // JSON data from Vercel
+      title = req.body.title;
+      content = req.body.content;
+      filename = req.body.filename;
+    } else {
+      // Fallback - not supported in serverless
+      return res.status(400).json({ error: '请发送JSON格式数据' });
+    }
+
     if (!title || !content) {
       return res.status(400).json({ error: '标题和内容都是必需的' });
     }
 
-    // Generate summary from content
+    // Generate summary
     const summary = content
       .replace(/[#*`]/g, '')
       .slice(0, 100)
@@ -38,7 +48,7 @@ export default async function handler(req, res) {
       message: '文章发布成功'
     });
   } catch (error) {
-    console.error('Upload API error:', error);
+    console.error('Upload error:', error);
     res.status(500).json({ error: '服务器错误，上传失败' });
   }
 }
