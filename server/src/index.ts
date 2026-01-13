@@ -3,13 +3,40 @@ import cors from 'cors';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { getDb } from './database';
 import { Post, User, AuthUser, BlogStats } from './types';
+
+const execAsync = promisify(exec);
 
 const app = express();
 const port = process.env.PORT || 3003;
 const upload = multer({ dest: 'uploads/' });
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Git operations
+async function commitToGit(filename: string, title: string) {
+  try {
+    // Check if we're in a git repository
+    await execAsync('git status');
+    
+    // Add the uploaded file to git (assuming it's saved to a posts directory)
+    const gitAddCommand = `git add posts/${filename} || git add "${filename}"`;
+    await execAsync(gitAddCommand);
+    
+    // Create commit with meaningful message
+    const commitMessage = `Add new blog post: ${title}`;
+    await execAsync(`git commit -m "${commitMessage}"`);
+    
+    console.log(`Successfully committed ${filename} to git`);
+    return true;
+  } catch (error: any) {
+    console.error('Git operation failed:', error.message);
+    // Don't fail the upload if git operations fail
+    return false;
+  }
+}
 
 app.use(cors());
 app.use(express.json());
@@ -256,16 +283,39 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
+    
     const fs = await import('fs/promises');
+    const path = await import('path');
+    
+    // Only process .md files
+    if (!req.file.originalname.endsWith('.md')) {
+      await fs.unlink(req.file.path);
+      return res.status(400).json({ error: 'Only .md files are allowed' });
+    }
+    
     const content = await fs.readFile(req.file.path, 'utf-8');
-    // Generate metadata (simplified)
+    const filename = req.file.originalname;
+    const title = req.file.originalname.replace('.md', '').replace(/[-_]/g, ' ');
+    
+    // Save the file to posts directory
+    const postsDir = path.join(process.cwd(), 'posts');
+    try {
+      await fs.access(postsDir);
+    } catch {
+      await fs.mkdir(postsDir, { recursive: true });
+    }
+    
+    const filePath = path.join(postsDir, filename);
+    await fs.writeFile(filePath, content);
+    
+    // Generate metadata
     const summary = content.slice(0, 100).replace(/[#*`]/g, '') + '...';
     const tags = ['markdown', 'blog', 'upload'];
     const id = `post-${Date.now()}`;
-    const title = req.file.originalname.replace('.md', '').replace(/[-_]/g, ' ');
     const author = 'admin';
     const createdAt = new Date().toISOString();
 
+    // Save to database
     const db = await getDb();
     await db.run(
       `INSERT INTO posts (id, title, content, summary, tags, createdAt, author, views)
@@ -273,10 +323,19 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       [id, title, content, summary, JSON.stringify(tags), createdAt, author]
     );
 
-    // Clean up uploaded file
+    // Clean up uploaded temp file
     await fs.unlink(req.file.path);
 
-    res.status(201).json({ id, title, summary });
+    // Commit to git
+    const gitSuccess = await commitToGit(filename, title);
+
+    res.status(201).json({ 
+      id, 
+      title, 
+      summary,
+      gitCommitted: gitSuccess,
+      message: gitSuccess ? 'Post uploaded and committed to git successfully' : 'Post uploaded (git commit failed)'
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });
