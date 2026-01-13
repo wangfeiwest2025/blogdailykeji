@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { join as pathJoin } from 'path';
 import { getDb } from './database';
 import { Post, User, AuthUser, BlogStats } from './types';
 
@@ -20,16 +21,19 @@ async function commitToGit(filename: string, title: string) {
   try {
     console.log(`Attempting to commit ${filename} to git...`);
     
-    // Check if we're in a git repository
-    await execAsync('git status', { cwd: process.cwd() });
+    // Git operations should run from parent directory (project root)
+    const projectRoot = pathJoin(process.cwd(), '..');
     
-    // Add uploaded file to git (use server/posts directory)
+    // Check if we're in a git repository
+    await execAsync('git status', { cwd: projectRoot });
+    
+    // Add uploaded file to git (relative to project root)
     const gitAddCommand = `git add server/posts/${filename}`;
-    await execAsync(gitAddCommand, { cwd: process.cwd() });
+    await execAsync(gitAddCommand, { cwd: projectRoot });
     
     // Create commit with meaningful message
     const commitMessage = `Add new blog post: ${title}`;
-    await execAsync(`git commit -m "${commitMessage}"`, { cwd: process.cwd() });
+    await execAsync(`git commit -m "${commitMessage}"`, { cwd: projectRoot });
     
     console.log(`Successfully committed server/posts/${filename} to git`);
     return true;
