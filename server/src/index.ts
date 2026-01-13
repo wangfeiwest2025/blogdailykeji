@@ -12,7 +12,7 @@ import { Post, User, AuthUser, BlogStats } from './types';
 const execAsync = promisify(exec);
 
 const app = express();
-const port = process.env.PORT || 3005;
+const port = process.env.PORT || 3007;
 const upload = multer({ dest: 'uploads/' });
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -45,7 +45,7 @@ async function commitToGit(filename: string, title: string) {
 }
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3006'],
+  origin: ['http://localhost:3000', 'http://localhost:3007'],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));

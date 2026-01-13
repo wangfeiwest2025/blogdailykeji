@@ -208,7 +208,7 @@ const App: React.FC = () => {
       formData.append('file', file);
       
       // Upload to server
-      const response = await fetch('http://localhost:3006/api/upload', {
+      const response = await fetch('http://localhost:3007/api/upload', {
         method: 'POST',
         body: formData,
       });
