@@ -128,10 +128,17 @@ const App: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Login attempt with:', loginInput.trim());
+    console.log('Comparison result:', loginInput.trim().toLowerCase() === 'wangfei');
+    
     if (loginInput.trim().toLowerCase() === 'wangfei') {
       setUser({ username: 'wangfei', isLoggedIn: true });
       setLoginInput('');
       setError(null);
+      console.log('Login successful!');
+    } else {
+      console.log('Login failed');
+      setError('用户名不正确，请输入 wangfei');
     }
   };
 
@@ -292,18 +299,21 @@ const App: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleLogin} className="flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder={t.adminPlaceholder} 
-                  value={loginInput} 
-                  onChange={e => setLoginInput(e.target.value)} 
-                  className="px-3 py-1.5 text-xs font-bold border-0 rounded-lg w-28 bg-gray-100 focus:ring-2 focus:ring-blue-600 transition-all outline-none" 
-                />
-                <button type="submit" className="bg-black text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                </button>
-              </form>
+              <div className="space-y-2">
+                <form onSubmit={handleLogin} className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder={t.adminPlaceholder} 
+                    value={loginInput} 
+                    onChange={e => setLoginInput(e.target.value)} 
+                    className="px-3 py-1.5 text-xs font-bold border-0 rounded-lg w-28 bg-gray-100 focus:ring-2 focus:ring-blue-600 transition-all outline-none" 
+                  />
+                  <button type="submit" className="bg-black text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                  </button>
+                </form>
+                {error && <p className="text-[8px] text-red-500 font-bold text-center">{error}</p>}
+              </div>
             )}
           </div>
         </div>
