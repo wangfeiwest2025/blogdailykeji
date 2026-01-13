@@ -18,18 +18,20 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 // Git operations
 async function commitToGit(filename: string, title: string) {
   try {
-    // Check if we're in a git repository
-    await execAsync('git status');
+    console.log(`Attempting to commit ${filename} to git...`);
     
-    // Add the uploaded file to git (assuming it's saved to a posts directory)
-    const gitAddCommand = `git add posts/${filename} || git add "${filename}"`;
-    await execAsync(gitAddCommand);
+    // Check if we're in a git repository
+    await execAsync('git status', { cwd: process.cwd() });
+    
+    // Add uploaded file to git (use server/posts directory)
+    const gitAddCommand = `git add server/posts/${filename}`;
+    await execAsync(gitAddCommand, { cwd: process.cwd() });
     
     // Create commit with meaningful message
     const commitMessage = `Add new blog post: ${title}`;
-    await execAsync(`git commit -m "${commitMessage}"`);
+    await execAsync(`git commit -m "${commitMessage}"`, { cwd: process.cwd() });
     
-    console.log(`Successfully committed ${filename} to git`);
+    console.log(`Successfully committed server/posts/${filename} to git`);
     return true;
   } catch (error: any) {
     console.error('Git operation failed:', error.message);
