@@ -81,23 +81,31 @@ const App: React.FC = () => {
         const response = await fetch(apiConfig.posts);
         if (response.ok) {
           const fetchedPosts = await response.json();
-          setPosts(fetchedPosts);
+          // Merge with localStorage posts
+          const localPosts = JSON.parse(localStorage.getItem('user_posts') || '[]');
+          const allPosts = [...fetchedPosts, ...localPosts];
+          setPosts(allPosts);
         }
       } catch (error) {
         console.error('Failed to fetch posts:', error);
-        // Fallback to initial post if API fails
-        setPosts([{
-          id: 'initial-1',
-          title: translations[lang].initialTitle,
-          content: lang === 'zh' 
-            ? '# 欢迎来到 dailykeji\n这里是技术与简约碰撞的地方。'
-            : '# Welcome to dailykeji\nThis is where technology meets simplicity.',
-          summary: translations[lang].initialSummary,
-          tags: ['welcome', 'tech', 'dailykeji'],
-          createdAt: new Date().toISOString(),
-          author: 'wangfei',
-          views: 0
-        }]);
+        // Use localStorage posts as fallback
+        const localPosts = JSON.parse(localStorage.getItem('user_posts') || '[]');
+        if (localPosts.length > 0) {
+          setPosts(localPosts);
+        } else {
+          setPosts([{
+            id: 'initial-1',
+            title: translations[lang].initialTitle,
+            content: lang === 'zh' 
+              ? '# 欢迎来到 dailykeji\n这里是技术与简约碰撞的地方。'
+              : '# Welcome to dailykeji\nThis is where technology meets simplicity.',
+            summary: translations[lang].initialSummary,
+            tags: ['welcome', 'tech', 'dailykeji'],
+            createdAt: new Date().toISOString(),
+            author: 'wangfei',
+            views: 0
+          }]);
+        }
       }
     };
 
@@ -289,11 +297,13 @@ const App: React.FC = () => {
       const apiConfig = getApiConfig();
       
       let response;
+      let fileContent = '';
+      let fileTitle = '';
       
       if (isProduction) {
         // Vercel: Send JSON with content
-        const content = await file.text();
-        const title = file.name.replace('.md', '').replace(/[-_]/g, ' ');
+        fileContent = await file.text();
+        fileTitle = file.name.replace('.md', '').replace(/[-_]/g, ' ');
         
         response = await fetch(apiConfig.upload, {
           method: 'POST',
@@ -301,8 +311,8 @@ const App: React.FC = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            title: title,
-            content: content,
+            title: fileTitle,
+            content: fileContent,
             filename: file.name
           }),
         });
@@ -310,6 +320,8 @@ const App: React.FC = () => {
         // Local: Send FormData with file
         const formData = new FormData();
         formData.append('file', file);
+        fileTitle = file.name.replace('.md', '').replace(/[-_]/g, ' ');
+        fileContent = await file.text();
         
         response = await fetch(apiConfig.upload, {
           method: 'POST',
@@ -324,17 +336,25 @@ const App: React.FC = () => {
       const result = await response.json();
       console.log('Upload result:', result);
       
-      // Refresh posts from backend after successful upload
-      try {
-        const apiConfig = getApiConfig();
-        const postsResponse = await fetch(apiConfig.posts);
-        if (postsResponse.ok) {
-          const updatedPosts = await postsResponse.json();
-          setPosts(updatedPosts);
-        }
-      } catch (error) {
-        console.error('Failed to refresh posts:', error);
-      }
+      // Save to localStorage for persistence
+      const newPost = {
+        id: result.id || `post-${Date.now()}`,
+        title: fileTitle,
+        content: fileContent,
+        summary: result.summary || fileContent.slice(0, 100).replace(/[#*`]/g, '') + '...',
+        tags: ['markdown', 'blog', 'upload'],
+        createdAt: new Date().toISOString(),
+        author: 'wangfei',
+        views: 0
+      };
+      
+      // Save to localStorage
+      const localPosts = JSON.parse(localStorage.getItem('user_posts') || '[]');
+      localPosts.unshift(newPost);
+      localStorage.setItem('user_posts', JSON.stringify(localPosts));
+      
+      // Update posts state
+      setPosts(prevPosts => [newPost, ...prevPosts]);
       
       // Show success message
       alert(`✅ 文章发布成功！`);
