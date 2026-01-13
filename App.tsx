@@ -81,9 +81,14 @@ const App: React.FC = () => {
         const response = await fetch(apiConfig.posts);
         if (response.ok) {
           const fetchedPosts = await response.json();
+          // Parse tags if they're strings
+          const parsedPosts = fetchedPosts.map((post: Post) => ({
+            ...post,
+            tags: typeof post.tags === 'string' ? JSON.parse(post.tags) : post.tags
+          }));
           // Merge with localStorage posts
           const localPosts = JSON.parse(localStorage.getItem('user_posts') || '[]');
-          const allPosts = [...fetchedPosts, ...localPosts];
+          const allPosts = [...parsedPosts, ...localPosts];
           setPosts(allPosts);
         }
       } catch (error) {
@@ -372,26 +377,28 @@ const App: React.FC = () => {
   const deletePost = async (id: string) => {
     if (window.confirm(t.deleteConfirm)) {
       try {
+        // Try deleting from API
         const apiConfig = getApiConfig();
-        const response = await fetch(`${apiConfig.baseUrl}/api/posts/${id}`, {
-          method: 'DELETE',
-        });
+        try {
+          await fetch(`${apiConfig.baseUrl}/api/posts/${id}`, {
+            method: 'DELETE',
+          });
+        } catch (error) {
+          console.log('API delete failed (expected for localStorage posts):', error);
+        }
         
-        if (response.ok) {
-          // Refresh posts from backend
-          const postsResponse = await fetch(apiConfig.posts);
-          if (postsResponse.ok) {
-            const updatedPosts = await postsResponse.json();
-            setPosts(updatedPosts);
-          }
-          
-          // Clear selected post if it was deleted
-          if (selectedPost?.id === id) {
-            setSelectedPost(null);
-            setIsEditing(false);
-          }
-        } else {
-          throw new Error('Delete failed');
+        // Delete from localStorage
+        const localPosts = JSON.parse(localStorage.getItem('user_posts') || '[]');
+        const filteredPosts = localPosts.filter((p: Post) => p.id !== id);
+        localStorage.setItem('user_posts', JSON.stringify(filteredPosts));
+        
+        // Update state
+        setPosts(prevPosts => prevPosts.filter(p => p.id !== id));
+        
+        // Clear selected post if it was deleted
+        if (selectedPost?.id === id) {
+          setSelectedPost(null);
+          setIsEditing(false);
         }
       } catch (error) {
         console.error('Delete error:', error);
